@@ -1,0 +1,51 @@
+#!/bin/bash
+
+echo "[+] Removing Cursor config and installation..."
+sudo rm -rf ~/.config/Cursor
+sudo rm -rf /root/.config/Cursor
+sudo rm -rf /opt/Cursor
+sudo rm -f /usr/local/bin/cursor
+
+echo "[+] Resetting machine ID..."
+sudo rm -f /etc/machine-id
+sudo rm -f /var/lib/dbus/machine-id
+sudo dbus-uuidgen --ensure=/etc/machine-id
+sudo dbus-uuidgen --ensure
+
+echo "[+] Installing macchanger if not present..."
+sudo apt-get install -y macchanger
+
+echo "[+] Detecting network interfaces..."
+iface=$(ip link | grep -Eo '^[0-9]+: [^:]*' | grep -v lo | awk '{print $2}' | head -n 1)
+
+if [ -z "$iface" ]; then
+  echo "[!] No network interface found."
+  exit 1
+fi
+
+echo "[+] Changing MAC address for $iface..."
+sudo ip link set $iface down
+sudo macchanger -r $iface
+sudo ip link set $iface up
+
+echo "[✓] System identifiers reset completed."
+
+sudo mkdir -p /opt/Cursor
+echo "[+] Copying Cursor AppImage from Downloads..."
+
+# Detect latest AppImage automatically if filename differs
+appimage_path=$(ls ~/Downloads/Cursor-*.AppImage 2>/dev/null | head -n 1)
+
+if [ -z "$appimage_path" ]; then
+  echo "[!] Cursor AppImage not found in ~/Downloads."
+  echo "    Please place it there or modify the path inside the script."
+  exit 1
+else
+  sudo cp "$appimage_path" /opt/Cursor/Cursor.AppImage
+fi
+
+sudo chmod +x /opt/Cursor/Cursor.AppImage
+sudo ln -sf /opt/Cursor/Cursor.AppImage /usr/local/bin/cursor
+
+echo "[✓] Cursor installation completed."
+echo "You can now run Cursor using: cursor --no-sandbox"
